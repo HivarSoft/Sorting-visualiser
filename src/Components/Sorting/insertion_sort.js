@@ -1,19 +1,17 @@
-const CANVAS_HEIGHT = 340;
-
 const C = {
-  default:  "linear-gradient(to top, #7c3aed, #06b6d4)",
-  compare:  "#06b6d4",
-  swap:     "#ef4444",
-  sorted:   "#10b981",
-  key:      "#f59e0b",
+  default: "linear-gradient(to top, #7c3aed, #06b6d4)",
+  compare: "#06b6d4",
+  swap:    "#ef4444",
+  sorted:  "#10b981",
+  key:     "#f59e0b",
 };
 
-let insertion_sort = (divs, div_sizes, enableButtons, delay_time, arsize) => {
+let insertion_sort = (divs, div_sizes, enableButtons, delay_time, arsize, canvasH) => {
   let c_delay = 0;
 
   function div_update(div, height, color) {
     window.setTimeout(() => {
-      div.style.height     = (height / 100) * CANVAS_HEIGHT + "px";
+      div.style.height     = (height / 100) * canvasH + "px";
       div.style.background = color;
     }, (c_delay += delay_time));
   }
