@@ -1,4 +1,3 @@
-const CANVAS_HEIGHT = 340;
 
 const C = {
   default:  "linear-gradient(to top, #7c3aed, #06b6d4)",
@@ -8,12 +7,12 @@ const C = {
   pivot:    "#f59e0b",
 };
 
-let bubble_sort = (divs, div_sizes, enableButtons, delay_time, arsize) => {
+let bubble_sort = (divs, div_sizes, enableButtons, delay_time, arsize, canvasH) => {
   let c_delay = 0;
 
   function div_update(div, height, color) {
     window.setTimeout(() => {
-      div.style.height     = (height / 100) * CANVAS_HEIGHT + "px";
+      div.style.height     = (height / 100) * canvasH + "px";
       div.style.background = color;
     }, (c_delay += delay_time));
   }

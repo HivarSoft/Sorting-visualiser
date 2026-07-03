@@ -2,7 +2,7 @@ import "./App.css";
 import Header from "./Components/Header.jsx";
 import Selection from "./Components/Selection.jsx";
 import Sorting from "./Components/Sorting.jsx";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import bubble_sort    from "./Components/Sorting/bubble_sort.js";
 import selection_sort from "./Components/Sorting/selection_sort.js";
 import insertion_sort from "./Components/Sorting/insertion_sort.js";
@@ -12,12 +12,10 @@ import quick_sort     from "./Components/Sorting/quick_sort.js";
 import heap_sorting   from "./Components/Sorting/heap_sort.js";
 import counting_sort  from "./Components/Sorting/counting_sort.js";
 
-// ─── Bar color used for default/idle bars ────────────────────────────────────
-// We use a CSS gradient string that matches our violet→cyan theme
 const BAR_DEFAULT_COLOR = "linear-gradient(to top, #7c3aed, #06b6d4)";
 
 let divs      = [];
-let div_sizes = [];
+let div_sizes = []; // values 10–100, treated as % of container height
 
 function App() {
   const [algo, setAlgo]       = useState("bubble");
@@ -26,40 +24,65 @@ function App() {
   const [running, setRunning] = useState(false);
   const contRef = useRef(null);
 
+  // ── Compute bar dimensions from live container size ─────────────────────────
+  const getBarDimensions = useCallback(() => {
+    const cont = contRef.current;
+    if (!cont) return { h: 340 };
+    const { height } = cont.getBoundingClientRect();
+    return { h: height || 340 };
+  }, []);
+
+  // ── Apply height to every bar (width is handled by flex) ────────────────────
+  const refreshBarStyles = useCallback(() => {
+    if (!divs.length) return;
+    const { h } = getBarDimensions();
+    divs.forEach((div, i) => {
+      div.style.height = (div_sizes[i] / 100) * h + "px";
+    });
+  }, [getBarDimensions]);
+
+  // ── ResizeObserver: re-scale bars whenever the container changes size ────────
   useEffect(() => {
-    generateArray(arsize);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arsize]);
+    const cont = contRef.current;
+    if (!cont) return;
+    const ro = new ResizeObserver(() => refreshBarStyles());
+    ro.observe(cont);
+    return () => ro.disconnect();
+  }, [refreshBarStyles]);
 
-  const CANVAS_HEIGHT = 340; // matches the container height in px
-
-  const generateArray = (size) => {
-    const cont = document.getElementById("array_container");
+  // ── Generate array ───────────────────────────────────────────────────────────
+  const generateArray = useCallback((size) => {
+    const cont = contRef.current;
     if (!cont) return;
     cont.innerHTML = "";
     divs      = [];
     div_sizes = [];
 
+    const { h } = getBarDimensions();
+
     for (let i = 0; i < size; i++) {
-      div_sizes[i] = Math.floor(Math.random() * 90) + 10; // 10–100 (percentage of canvas)
+      div_sizes[i] = Math.floor(Math.random() * 88) + 10; // 10–98%
       divs[i]      = document.createElement("div");
-
-      const pct = 100 / (size - 2 * 0.1);
       divs[i].style.cssText = [
+        "flex:1",                               // fills width automatically, no overflow
+        "min-width:0",                          // allows shrinking below content size
         "margin:0 1px",
+        `height:${(div_sizes[i] / 100) * h}px`,
         `background:${BAR_DEFAULT_COLOR}`,
-        `width:${pct}%`,
-        `height:${(div_sizes[i] / 100) * CANVAS_HEIGHT}px`,
         "border-radius:3px 3px 0 0",
-        "transition:height 0.05s ease",
-        "flex-shrink:0",
+        "transition:height 0.04s ease, background 0.1s ease",
       ].join(";");
-
       cont.appendChild(divs[i]);
     }
-  };
+  }, [getBarDimensions]);
 
-  // ─── Button refs for disable/enable ────────────────────────────────────────
+  useEffect(() => {
+    // Wait one frame so the container has rendered and getBoundingClientRect works
+    const id = requestAnimationFrame(() => generateArray(arsize));
+    return () => cancelAnimationFrame(id);
+  }, [arsize, generateArray]);
+
+  // ── Disable / enable controls ────────────────────────────────────────────────
   const disableButtons = () => {
     setRunning(true);
     ["arr_size", "algo_speed", "a_generate", "al_btn", "algo_inp"].forEach((id) => {
@@ -76,27 +99,28 @@ function App() {
     });
   };
 
-  // ─── Speed mapping ──────────────────────────────────────────────────────────
+  // ── Speed mapping ────────────────────────────────────────────────────────────
   const getDelayTime = (speed, size) => {
     const multipliers = { 1: 1, 2: 10, 3: 100, 4: 1000, 5: 10000 };
     const mult = multipliers[parseInt(speed)] ?? 100;
     return 1000 / (Math.floor(size / 10) * mult);
   };
 
-  // ─── Run selected algorithm ─────────────────────────────────────────────────
+  // ── Run algorithm ────────────────────────────────────────────────────────────
   const AlgoRunner = () => {
     disableButtons();
-    const delay = getDelayTime(alspeed, arsize);
+    const delay      = getDelayTime(alspeed, arsize);
+    const canvasH    = contRef.current?.getBoundingClientRect().height || 340;
 
     const map = {
-      bubble:    () => bubble_sort(divs, div_sizes, enableButtons, delay, arsize),
-      selection: () => selection_sort(divs, div_sizes, enableButtons, delay, arsize),
-      insertion: () => insertion_sort(divs, div_sizes, enableButtons, delay, arsize),
-      shell:     () => shell_sort(divs, div_sizes, enableButtons, delay, arsize),
-      merge:     () => merge_sort(divs, div_sizes, enableButtons, delay, arsize),
-      quick:     () => quick_sort(divs, div_sizes, enableButtons, delay, arsize),
-      heap:      () => heap_sorting(divs, div_sizes, enableButtons, delay, arsize),
-      counting:  () => counting_sort(divs, div_sizes, enableButtons, delay, arsize),
+      bubble:    () => bubble_sort(divs, div_sizes, enableButtons, delay, arsize, canvasH),
+      selection: () => selection_sort(divs, div_sizes, enableButtons, delay, arsize, canvasH),
+      insertion: () => insertion_sort(divs, div_sizes, enableButtons, delay, arsize, canvasH),
+      shell:     () => shell_sort(divs, div_sizes, enableButtons, delay, arsize, canvasH),
+      merge:     () => merge_sort(divs, div_sizes, enableButtons, delay, arsize, canvasH),
+      quick:     () => quick_sort(divs, div_sizes, enableButtons, delay, arsize, canvasH),
+      heap:      () => heap_sorting(divs, div_sizes, enableButtons, delay, arsize, canvasH),
+      counting:  () => counting_sort(divs, div_sizes, enableButtons, delay, arsize, canvasH),
     };
 
     (map[algo] ?? map.bubble)();
@@ -104,10 +128,8 @@ function App() {
 
   return (
     <div className="min-h-screen grid-bg pb-10">
-      {/* ── Header ── */}
       <Header />
 
-      {/* ── Controls ── */}
       <Selection
         arsize={arsize}
         alspeed={alspeed}
@@ -116,13 +138,11 @@ function App() {
         genNewBtn_handle={() => generateArray(arsize)}
       />
 
-      {/* ── Algorithm picker + info ── */}
       <Sorting algo={algo} setAlgo={setAlgo} AlgoRunner={AlgoRunner} />
 
       {/* ── Visualiser canvas ── */}
       <div className="mx-4 mt-4">
         <div className="glass-card p-4 glow-purple">
-          {/* Canvas header */}
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest font-mono">
               Visualiser
@@ -135,29 +155,33 @@ function App() {
             )}
           </div>
 
-          {/* Bar container — bars grow upward via align-items: flex-end */}
+          {/*
+            Container:
+            - w-full so it always fills the card
+            - fixed height via aspect-ratio fallback + clamp so it scales on mobile
+            - overflow-hidden clips any sub-pixel bleed
+            - align-items: flex-end makes bars grow upward from the bottom
+          */}
           <div
             id="array_container"
             ref={contRef}
             style={{
-              height: "340px",
+              width: "100%",
+              height: "clamp(180px, 40vh, 380px)",
               display: "flex",
               flexDirection: "row",
               alignItems: "flex-end",
-              padding: "0 2px",
-              borderRadius: "12px",
               overflow: "hidden",
+              borderRadius: "10px",
+              padding: "0",
             }}
-          ></div>
+          />
         </div>
       </div>
 
-      {/* ── Footer ── */}
       <footer className="mt-8 flex flex-col items-center gap-1 text-xs text-slate-500 font-mono">
         <p>
-          Made with{" "}
-          <span className="text-rose-400">♥</span>{" "}
-          by{" "}
+          Made with <span className="text-rose-400">♥</span> by{" "}
           <a href="https://hiteshk.dev" className="text-violet-400 hover:text-violet-300 transition-colors">
             @devhiteshk
           </a>
