@@ -25,18 +25,21 @@ function App() {
   const contRef = useRef(null);
 
   // ── Compute bar dimensions from live container size ─────────────────────────
-  const getBarDimensions = useCallback(() => {
+  const getBarDimensions = useCallback((size) => {
     const cont = contRef.current;
-    if (!cont) return { h: 340 };
-    const { height } = cont.getBoundingClientRect();
-    return { h: height || 340 };
+    if (!cont) return { w: 2, h: 340 };
+    const { width, height } = cont.getBoundingClientRect();
+    // Exact formula: total_width / total_bars — no margins, no gaps
+    const w = Math.max(1, width / (size || divs.length || 1));
+    return { w, h: height || 340 };
   }, []);
 
-  // ── Apply height to every bar (width is handled by flex) ────────────────────
+  // ── Re-apply width + height to every bar on resize ──────────────────────────
   const refreshBarStyles = useCallback(() => {
     if (!divs.length) return;
-    const { h } = getBarDimensions();
+    const { w, h } = getBarDimensions(divs.length);
     divs.forEach((div, i) => {
+      div.style.width  = w + "px";
       div.style.height = (div_sizes[i] / 100) * h + "px";
     });
   }, [getBarDimensions]);
@@ -58,19 +61,21 @@ function App() {
     divs      = [];
     div_sizes = [];
 
-    const { h } = getBarDimensions();
+    const { w, h } = getBarDimensions(size);
 
     for (let i = 0; i < size; i++) {
       div_sizes[i] = Math.floor(Math.random() * 88) + 10; // 10–98%
       divs[i]      = document.createElement("div");
       divs[i].style.cssText = [
-        "flex:1",                               // fills width automatically, no overflow
-        "min-width:0",                          // allows shrinking below content size
-        "margin:0 1px",
+        // width = parent_width / total_bars exactly, no margins
+        `width:${w}px`,
         `height:${(div_sizes[i] / 100) * h}px`,
         `background:${BAR_DEFAULT_COLOR}`,
-        "border-radius:3px 3px 0 0",
+        "border-radius:2px 2px 0 0",
+        "border:1px solid rgba(255,255,255,0.4)",
         "transition:height 0.04s ease, background 0.1s ease",
+        "flex-shrink:0",       // prevent flex from resizing — we own the width
+        "box-sizing:border-box",
       ].join(";");
       cont.appendChild(divs[i]);
     }
@@ -155,13 +160,6 @@ function App() {
             )}
           </div>
 
-          {/*
-            Container:
-            - w-full so it always fills the card
-            - fixed height via aspect-ratio fallback + clamp so it scales on mobile
-            - overflow-hidden clips any sub-pixel bleed
-            - align-items: flex-end makes bars grow upward from the bottom
-          */}
           <div
             id="array_container"
             ref={contRef}
@@ -174,6 +172,7 @@ function App() {
               overflow: "hidden",
               borderRadius: "10px",
               padding: "0",
+              boxSizing: "border-box",
             }}
           />
         </div>
